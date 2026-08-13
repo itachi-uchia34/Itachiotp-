@@ -5,5 +5,8 @@
   "description": "Fetch CR API stats and forward OTP response to Telegram",
   "scripts": {
     "start": "node fetch-and-send-otp.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
