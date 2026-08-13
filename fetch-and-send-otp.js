@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const API_URL = process.env.CRAPI_URL || 'http://147.135.212.197/crapi/had/viewstats';
+const POLL_INTERVAL_MS = 30_000;
 
 function requireEnv(name) {
   const value = process.env[name];
@@ -63,27 +64,38 @@ function deepCollectOtpValues(value, path = [], found = new Set()) {
   return found;
 }
 
-function formatTelegramText(apiResponse, apiRequestUrl) {
+function formatTelegramText(apiResponse) {
   const otpValues = [...deepCollectOtpValues(apiResponse)];
-  const safeUrl = apiRequestUrl.replace(/token=[^&]+/i, 'token=***');
-  const responseSnippet = JSON.stringify(apiResponse).slice(0, 3000);
 
   const lines = [
-    'CR API OTP Update',
-    `URL: ${safeUrl}`,
+    'OTP Update',
     `Time: ${new Date().toISOString()}`,
-    otpValues.length ? `OTP Values: ${otpValues.join(', ')}` : 'OTP Values: Not found',
-    '',
-    'Response:',
-    responseSnippet,
+    otpValues.length ? otpValues.join(', ') : 'OTP not found',
   ];
 
   return lines.join('\n').slice(0, 3900);
 }
 
-async function sendTelegramMessage(text) {
+function getChatIds() {
+  const raw = process.env.TELEGRAM_CHAT_IDS || process.env.TELEGRAM_CHAT_ID;
+  if (!raw) {
+    throw new Error('Missing required environment variable: TELEGRAM_CHAT_IDS (or TELEGRAM_CHAT_ID)');
+  }
+
+  const ids = raw
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  if (!ids.length) {
+    throw new Error('No valid Telegram chat IDs found in TELEGRAM_CHAT_IDS/TELEGRAM_CHAT_ID');
+  }
+
+  return ids;
+}
+
+async function sendTelegramMessageToChat(chatId, text) {
   const botToken = requireEnv('TELEGRAM_BOT_TOKEN');
-  const chatId = requireEnv('TELEGRAM_CHAT_ID');
 
   const telegramUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
   const res = await fetch(telegramUrl, {
@@ -104,7 +116,18 @@ async function sendTelegramMessage(text) {
   return res.json();
 }
 
-async function main() {
+async function sendTelegramMessage(text) {
+  const chatIds = getChatIds();
+  const results = await Promise.allSettled(chatIds.map((chatId) => sendTelegramMessageToChat(chatId, text)));
+  const failures = results.filter((result) => result.status === 'rejected');
+
+  if (failures.length) {
+    const reasons = failures.map((failure) => failure.reason?.message || String(failure.reason)).join('; ');
+    throw new Error(`Failed to send to ${failures.length}/${chatIds.length} chat IDs: ${reasons}`);
+  }
+}
+
+async function fetchApiResponse() {
   const url = buildApiUrl();
 
   const apiResponse = await fetch(url);
@@ -113,18 +136,29 @@ async function main() {
     throw new Error(`CR API request failed (${apiResponse.status}): ${body}`);
   }
 
-  let parsed;
+  const raw = await apiResponse.text();
   try {
-    parsed = await apiResponse.json();
+    return JSON.parse(raw);
   } catch {
-    const text = await apiResponse.text();
-    parsed = { raw: text };
+    return { raw };
   }
+}
 
-  const message = formatTelegramText(parsed, url);
+async function runOnce() {
+  const parsed = await fetchApiResponse();
+  const message = formatTelegramText(parsed);
   await sendTelegramMessage(message);
+  console.log(`[${new Date().toISOString()}] API response fetched and OTP sent to Telegram chat IDs.`);
+}
 
-  console.log('API response fetched and forwarded to Telegram successfully.');
+async function main() {
+  await runOnce();
+
+  setInterval(() => {
+    runOnce().catch((error) => {
+      console.error(error.message || error);
+    });
+  }, POLL_INTERVAL_MS);
 }
 
 main().catch((error) => {
