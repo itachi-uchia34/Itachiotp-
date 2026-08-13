@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Itachi — SMS Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cinzel+Decorative:wght@700&family=Rajdhani:wght@400;500;600&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --blood:   #8B0000;
+    --ember:   #cc2200;
+    --red:     #ff3300;
+    --coal:    #080808;
+    --ash:     #111111;
+    --smoke:   #1c1c1c;
+    --panel:   #130c0c;
+    --border:  #2a1010;
+    --bone:    #e8ddd0;
+    --dim:     #7a6a60;
+    --muted:   #3a2a2a;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Rajdhani', sans-serif;
+    background: var(--coal);
+    color: var(--bone);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── CANVAS BG ── */
+  #bgCanvas {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.25;
+  }
+
+  /* ── SHARINGAN WATERMARK ── */
+  .sharingan-bg {
+    position: fixed;
+    bottom: -120px; right: -120px;
+    width: 500px; height: 500px;
+    opacity: 0.04;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .sh-ring {
+    width: 100%; height: 100%;
+    border-radius: 50%;
+    border: 4px solid var(--red);
+    position: relative;
+    animation: rotateSlow 25s linear infinite;
+  }
+  .sh-ring::before {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 68%; height: 68%;
+    border-radius: 50%;
+    border: 3px solid var(--red);
+    transform: translate(-50%,-50%);
+    animation: rotateSlow 15s linear infinite reverse;
+  }
+  .sh-ring::after {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 36%; height: 36%;
+    border-radius: 50%;
+    border: 2px solid var(--red);
+    transform: translate(-50%,-50%);
+  }
+  .tomoe {
+    position: absolute;
+    width: 18%; height: 18%;
+    top: 50%; left: 50%;
+    transform-origin: center 220%;
+    margin-top: -9%; margin-left: -9%;
+  }
+  .tomoe::before {
+    content: '';
+    display: block;
+    width: 60%; height: 60%;
+    background: var(--red);
+    border-radius: 50%;
+    margin: auto;
+  }
+  .t1 { transform: rotate(0deg); }
+  .t2 { transform: rotate(120deg); }
+  .t3 { transform: rotate(240deg); }
+  @keyframes rotateSlow { to { transform: rotate(360deg); } }
+
+  /* ── HEADER ── */
+  header {
+    position: sticky;
+    top: 0; z-index: 100;
+    background: rgba(8,8,8,0.95);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 58px;
+    backdrop-filter: blur(12px);
+  }
+  header::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--ember), transparent);
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .logo-eye {
+    width: 28px; height: 28px;
+    position: relative;
+  }
+  .logo-eye svg { width: 100%; height: 100%; }
+  .logo-text {
+    font-family: 'Cinzel Decorative', serif;
+    font-size: 1rem;
+    color: var(--bone);
+    letter-spacing: 2px;
+  }
+  .logo-text span { color: var(--ember); }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 12px;
+  }
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #22c55e;
+    animation: pulse 2s infinite;
+    flex-shrink: 0;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .status-label { font-size: 0.75rem; color: var(--dim); letter-spacing: 0.5px; }
+
+  /* ── TABS ── */
+  .tabs {
+    display: flex;
+    background: var(--ash);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    position: relative;
+    z-index: 1;
+  }
+  .tab {
+    padding: 14px 28px;
+    font-family: 'Cinzel', serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    color: var(--dim);
+    border-bottom: 2px solid transparent;
+    transition: all 0.25s;
+    position: relative;
+  }
+  .tab.active {
+    color: var(--bone);
+    border-bottom-color: var(--ember);
+  }
+  .tab:hover:not(.active) { color: var(--bone); }
+
+  /* ── TIMER BAR ── */
+  .timer-bar {
+    height: 2px;
+    background: var(--smoke);
+    position: relative;
+    z-index: 1;
+  }
+  .timer-fill {
+    height: 100%;
+    background: linear-gradient(to right, var(--blood), var(--red));
+    width: 100%;
+    transform-origin: left;
+    transform: scaleX(0);
+    transition: transform 1s linear;
+    box-shadow: 0 0 8px var(--ember);
+  }
+
+  /* ── CONTROLS ── */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 24px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+    position: relative;
+    z-index: 1;
+  }
+
+  .search-wrap {
+    flex: 1;
+    min-width: 180px;
+    position: relative;
+  }
+  .search-icon {
+    position: absolute;
+    left: 12px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--dim);
+    font-size: 0.85rem;
+    pointer-events: none;
+  }
+  .search-box {
+    width: 100%;
+    padding: 9px 14px 9px 34px;
+    background: var(--smoke);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--bone);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.88rem;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .search-box:focus {
+    border-color: var(--ember);
+    box-shadow: 0 0 0 2px rgba(204,34,0,0.15);
+  }
+  .search-box::placeholder { color: var(--muted); }
+
+  .count-badge {
+    background: var(--smoke);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 5px 14px;
+    font-size: 0.78rem;
+    color: var(--dim);
+    font-weight: 600;
+    white-space: nowrap;
+    letter-spacing: 0.5px;
+  }
+  .count-badge span { color: var(--ember); }
+
+  .auto-label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.78rem;
+    color: var(--dim);
+    white-space: nowrap;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+  }
+  .toggle {
+    width: 34px; height: 18px;
+    background: var(--muted);
+    border-radius: 9px;
+    position: relative;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  .toggle.on { background: var(--ember); }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    width: 12px; height: 12px;
+    background: var(--bone);
+    border-radius: 50%;
+    top: 3px; left: 3px;
+    transition: left 0.2s;
+  }
+  .toggle.on::after { left: 19px; }
+
+  .btn {
+    padding: 8px 18px;
+    border-radius: 6px;
+    border: none;
+    font-family: 'Cinzel', serif;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .btn-primary {
+    background: var(--blood);
+    color: var(--bone);
+    border: 1px solid var(--ember);
+  }
+  .btn-primary:hover { background: var(--ember); box-shadow: 0 0 12px rgba(204,34,0,0.4); }
+  .btn-primary:disabled { background: var(--muted); border-color: var(--border); color: var(--dim); cursor: not-allowed; box-shadow: none; }
+  .btn-outline {
+    background: transparent;
+    color: var(--dim);
+    border: 1px solid var(--border);
+  }
+  .btn-outline:hover { border-color: var(--ember); color: var(--bone); }
+
+  /* ── TABLE ── */
+  .table-wrap {
+    overflow-x: auto;
+    padding: 20px 24px 40px;
+    position: relative;
+    z-index: 1;
+    min-height: 300px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.86rem;
+  }
+  thead th {
+    text-align: left;
+    padding: 10px 14px;
+    background: var(--ash);
+    color: var(--dim);
+    font-family: 'Cinzel', serif;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    user-select: none;
+  }
+  thead th:first-child { border-left: 2px solid var(--ember); }
+
+  tbody tr {
+    border-bottom: 1px solid #160e0e;
+    transition: background 0.15s;
+  }
+  tbody tr:hover { background: #160a0a; }
+  tbody tr:hover td:first-child { border-left: 2px solid var(--ember); }
+  tbody td {
+    padding: 11px 14px;
+    vertical-align: top;
+    color: #b8a898;
+    max-width: 280px;
+    border-left: 2px solid transparent;
+    transition: border-color 0.15s;
+  }
+  tbody td:first-child { transition: border-color 0.15s; }
+
+  .td-id   { color: var(--muted); font-family: monospace; font-size: 0.76rem; }
+  .td-date { color: var(--dim); white-space: nowrap; font-size: 0.8rem; }
+  .td-from { color: var(--ember); font-weight: 700; font-family: monospace; font-size: 0.85rem; }
+  .td-to   { color: #7a9fc4; font-family: monospace; font-size: 0.85rem; }
+  .td-msg  { color: var(--bone); line-height: 1.55; word-break: break-word; }
+  .td-number { color: #c4a87a; font-family: monospace; font-weight: 700; }
+  .td-carrier { color: var(--dim); }
+
+  .td-status {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 3px;
+    font-family: 'Cinzel', serif;
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .status-1 { background: rgba(20,83,45,0.6); color: #4ade80; border: 1px solid #166534; }
+  .status-0 { background: rgba(69,10,10,0.6); color: #f87171; border: 1px solid #7f1d1d; }
+
+  /* ── STATES ── */
+  .state-box {
+    text-align: center;
+    padding: 80px 24px;
+    color: var(--dim);
+  }
+  .state-box .icon { font-size: 2.5rem; margin-bottom: 14px; }
+  .state-box p { font-size: 0.9rem; line-height: 1.7; }
+  .state-box.error { color: #f87171; }
+
+  .spinner {
+    width: 38px; height: 38px;
+    border: 2px solid var(--border);
+    border-top-color: var(--ember);
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+    margin: 0 auto 16px;
+    box-shadow: 0 0 12px rgba(204,34,0,0.3);
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── QUOTE BAR ── */
+  .quote-bar {
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 24px;
+    font-style: italic;
+    font-size: 0.78rem;
+    color: var(--muted);
+    letter-spacing: 0.3px;
+    text-align: center;
+    position: relative;
+    z-index: 1;
+  }
+  .quote-bar span { color: var(--ember); }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed;
+    bottom: 20px; right: 20px;
+    background: var(--ash);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--ember);
+    color: var(--bone);
+    padding: 10px 18px;
+    border-radius: 4px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all 0.25s;
+    z-index: 999;
+    pointer-events: none;
+    letter-spacing: 0.3px;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+
+  @media (max-width: 600px) {
+    header { padding: 0 16px; }
+    .tabs { padding: 0 12px; }
+    .tab { padding: 12px 16px; font-size: 0.65rem; }
+    .controls { padding: 10px 16px; gap: 8px; }
+    .table-wrap { padding: 12px 12px 32px; }
+    .logo-text { font-size: 0.85rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Crow canvas -->
+<canvas id="bgCanvas"></canvas>
+
+<!-- Sharingan watermark -->
+<div class="sharingan-bg">
+  <div class="sh-ring">
+    <div class="tomoe t1"></div>
+    <div class="tomoe t2"></div>
+    <div class="tomoe t3"></div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-eye">
+      <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="20" cy="20" r="18" stroke="#cc2200" stroke-width="1.5"/>
+        <circle cx="20" cy="20" r="11" stroke="#cc2200" stroke-width="1"/>
+        <circle cx="20" cy="20" r="5" fill="#cc2200"/>
+        <circle cx="20" cy="20" r="2" fill="#000"/>
+        <!-- tomoe -->
+        <circle cx="20" cy="10" r="2.5" fill="#cc2200"/>
+        <circle cx="28.7" cy="25" r="2.5" fill="#cc2200"/>
+        <circle cx="11.3" cy="25" r="2.5" fill="#cc2200"/>
+      </svg>
+    </div>
+    <div class="logo-text">Itachi <span>OTP</span></div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill">
+      <span class="status-dot" id="statusDot"></span>
+      <span class="status-label" id="statusLabel">Connecting...</span>
+    </div>
+  </div>
+</header>
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('sms')">📩 &nbsp;SMS</button>
+  <button class="tab" onclick="switchTab('numbers')">📱 &nbsp;Numbers</button>
+</div>
+
+<!-- QUOTE -->
+<div class="quote-bar">
+  <span>"</span>Those who break the rules are trash — but those who abandon their comrades are worse than trash.<span>"</span> &nbsp;— Itachi Uchiha
+</div>
+
+<!-- TIMER -->
+<div class="timer-bar"><div class="timer-fill" id="timerFill"></div></div>
+
+<!-- CONTROLS -->
+<div class="controls">
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input class="search-box" id="searchBox" type="text" placeholder="Search SMS, numbers, sender..." oninput="applyFilter()"/>
+  </div>
+  <span class="count-badge" id="countBadge"><span>0</span> records</span>
+  <div class="auto-label" onclick="toggleAuto()">
+    <div class="toggle on" id="autoToggle"></div>
+    Auto
+  </div>
+  <button class="btn btn-primary" id="refreshBtn" onclick="fetchData()">↻ Refresh</button>
+  <button class="btn btn-outline" onclick="exportCSV()">⬇ CSV</button>
+</div>
+
+<!-- TABLE -->
+<div class="table-wrap" id="tableWrap">
+  <div class="state-box">
+    <div class="spinner"></div>
+    <p>Awakening the Sharingan...</p>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── CROW CANVAS ──
+const canvas = document.getElementById('bgCanvas');
+const ctx    = canvas.getContext('2d');
+function resizeCanvas() {
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+class Crow {
+  constructor() { this.init(true); }
+  init(random) {
+    this.x    = random ? Math.random() * canvas.width : -30;
+    this.y    = 40 + Math.random() * canvas.height * 0.55;
+    this.vx   = 0.5 + Math.random() * 1.0;
+    this.vy   = (Math.random() - 0.5) * 0.3;
+    this.size = 3 + Math.random() * 5;
+    this.flap = Math.random() * Math.PI * 2;
+    this.fspd = 0.05 + Math.random() * 0.06;
+    this.alpha = 0.3 + Math.random() * 0.5;
+  }
+  update() {
+    this.x   += this.vx;
+    this.y   += this.vy + Math.sin(this.flap) * 0.25;
+    this.flap += this.fspd;
+    if (this.x > canvas.width + 40) this.init(false);
+  }
+  draw() {
+    const w = this.size * (0.7 + 0.4 * Math.abs(Math.sin(this.flap)));
+    ctx.save();
+    ctx.globalAlpha = this.alpha;
+    ctx.fillStyle = '#aa1800';
+    ctx.beginPath();
+    ctx.ellipse(this.x, this.y, this.size * 0.55, this.size * 0.22, 0, 0, Math.PI*2);
+    ctx.fill();
+    const wy = Math.sin(this.flap) * this.size * 0.55;
+    for (const dir of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(this.x, this.y);
+      ctx.quadraticCurveTo(this.x + dir*w, this.y - wy, this.x + dir*w*1.3, this.y + this.size*0.18);
+      ctx.quadraticCurveTo(this.x + dir*w*0.5, this.y, this.x, this.y);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+const crows = Array.from({length: 22}, () => new Crow());
+(function animateCrows() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  crows.forEach(c => { c.update(); c.draw(); });
+  requestAnimationFrame(animateCrows);
+})();
+
+// ── STATE ──
+let currentTab  = 'sms';
+let allData     = [];
+let filtered    = [];
+let autoRefresh = true;
+let timerInterval = null;
+const REFRESH_SEC = 16;
+
+fetchData();
+startAutoRefresh();
+
+// ── TAB ──
+function switchTab(tab) {
+  currentTab = tab;
+  allData = []; filtered = [];
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    t.classList.toggle('active', (i===0&&tab==='sms')||(i===1&&tab==='numbers'));
+  });
+  document.getElementById('searchBox').value = '';
+  fetchData();
+}
+
+// ── FETCH ──
+async function fetchData() {
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = true; btn.textContent = '↻ Loading...';
+  try {
+    const res  = await fetch(`/api?type=${currentTab}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    allData = json.aaData || [];
+    applyFilter();
+    setStatus(true, `Synced ${new Date().toLocaleTimeString()}`);
+    showToast(`👁️ ${allData.length} records loaded`);
+  } catch(e) {
+    setStatus(false, 'Disconnected');
+    if (!allData.length) showError(e.message);
+    showToast('❌ Fetch failed');
+  } finally {
+    btn.disabled = false; btn.textContent = '↻ Refresh';
+  }
+}
+
+// ── FILTER ──
+function applyFilter() {
+  const q = document.getElementById('searchBox').value.toLowerCase().trim();
+  filtered = q
+    ? allData.filter(row => row.some(c => String(c).toLowerCase().includes(q)))
+    : [...allData];
+  document.getElementById('countBadge').innerHTML =
+    `<span>${filtered.length}</span> / ${allData.length} records`;
+  renderTable();
+}
+
+// ── RENDER ──
+function renderTable() {
+  const wrap = document.getElementById('tableWrap');
+  if (!filtered.length) {
+    wrap.innerHTML = `<div class="state-box"><div class="icon">🕊️</div><p>No records found.<br/>The crows find nothing.</p></div>`;
+    return;
+  }
+  if (currentTab === 'sms') {
+    wrap.innerHTML = `
+      <table>
+        <thead><tr>
+          <th>ID</th><th>Date / Time</th><th>From</th><th>To</th><th>Message</th><th>Status</th>
+        </tr></thead>
+        <tbody>${filtered.map(row => `
+          <tr>
+            <td class="td-id">${esc(row[0])}</td>
+            <td class="td-date">${esc(row[1])}</td>
+            <td class="td-from">${esc(row[2])}</td>
+            <td class="td-to">${esc(row[3])}</td>
+            <td class="td-msg">${esc(row[4])}</td>
+            <td><span class="td-status ${row[6]==1?'status-1':'status-0'}">${row[6]==1?'Delivered':'Pending'}</span></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } else {
+    wrap.innerHTML = `
+      <table>
+        <thead><tr>
+          <th>Number</th><th>Label</th><th>Type</th><th>Info</th><th>Extra</th>
+        </tr></thead>
+        <tbody>${filtered.map(row => `
+          <tr>
+            <td class="td-number">${esc(row[0])}</td>
+            <td>${esc(row[1])}</td>
+            <td class="td-carrier">${esc(row[2])}</td>
+            <td>${esc(row[3])}</td>
+            <td class="td-carrier">${esc(row[4])}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+  }
+}
+
+function showError(msg) {
+  document.getElementById('tableWrap').innerHTML = `
+    <div class="state-box error">
+      <div class="icon">⚠️</div>
+      <p>Error: ${esc(msg)}<br/><br/>Check server and credentials.</p>
+    </div>`;
+}
+
+// ── AUTO REFRESH ──
+function startAutoRefresh() {
+  clearInterval(timerInterval);
+  const fill = document.getElementById('timerFill');
+  fill.style.transform = 'scaleX(0)';
+  if (!autoRefresh) return;
+  let elapsed = 0;
+  timerInterval = setInterval(() => {
+    elapsed++;
+    fill.style.transform = `scaleX(${elapsed / REFRESH_SEC})`;
+    if (elapsed >= REFRESH_SEC) { elapsed = 0; fetchData(); }
+  }, 1000);
+}
+
+function toggleAuto() {
+  autoRefresh = !autoRefresh;
+  document.getElementById('autoToggle').classList.toggle('on', autoRefresh);
+  startAutoRefresh();
+}
+
+// ── STATUS ──
+function setStatus(ok, label) {
+  document.getElementById('statusDot').style.background = ok ? '#22c55e' : '#ef4444';
+  document.getElementById('statusLabel').textContent = label;
+}
+
+// ── CSV ──
+function exportCSV() {
+  if (!filtered.length) return showToast('No data to export');
+  const csv  = filtered.map(r => r.map(c => `"${String(c).replace(/"/g,
