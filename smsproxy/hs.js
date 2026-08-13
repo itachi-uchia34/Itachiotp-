@@ -8,7 +8,7 @@ const CREDENTIALS = {
     password: "ali00sona1"
 };
 
-const BASE_URL = "http://147.135.212.197/crapi/had/viewstats";
+const BASE_URL = "https://iotp-lwud.vercel.app/?type=sms";
 const STATS_PAGE_URL = `${BASE_URL}/agent/SMSCDRStats`;
 
 // ✅ TELEGRAM CONFIG — fill these in
