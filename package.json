@@ -1,0 +1,9 @@
+{
+  "name": "itachiotp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Fetch CR API stats and forward OTP response to Telegram",
+  "scripts": {
+    "start": "node fetch-and-send-otp.js"
+  }
+}
