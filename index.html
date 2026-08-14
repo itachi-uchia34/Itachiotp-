@@ -1,37 +1,673 @@
+cat > /home/claude/Itachiotp--main/index.html << 'HTMLEOF'
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Itachi OTP Forwarder</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-  </head>
-  <body class="min-h-screen bg-slate-950 text-slate-100">
-    <main class="mx-auto flex min-h-screen max-w-3xl items-center px-6 py-12">
-      <section class="w-full rounded-2xl border border-slate-800 bg-slate-900/60 p-8 shadow-2xl shadow-black/30">
-        <p class="mb-2 inline-flex rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-300">
-          Live OTP Forwarder
-        </p>
-        <h1 class="text-3xl font-bold tracking-tight">Telegram OTP Relay</h1>
-        <p class="mt-3 text-slate-300">
-          This service fetches OTP values from the CR API and forwards them to one or more Telegram chat IDs every 30 seconds.
-        </p>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
 
-        <div class="mt-6 grid gap-4 sm:grid-cols-3">
-          <article class="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
-            <h2 class="text-sm font-semibold text-slate-200">Polling</h2>
-            <p class="mt-2 text-sm text-slate-400">Runs every 30 seconds.</p>
-          </article>
-          <article class="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
-            <h2 class="text-sm font-semibold text-slate-200">Delivery</h2>
-            <p class="mt-2 text-sm text-slate-400">Sends OTP-only updates to Telegram.</p>
-          </article>
-          <article class="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
-            <h2 class="text-sm font-semibold text-slate-200">Multi-chat</h2>
-            <p class="mt-2 text-sm text-slate-400">Supports comma-separated chat IDs.</p>
-          </article>
+      :root {
+        --bg:        #0a0a0b;
+        --bg2:       #111114;
+        --bg3:       #18181c;
+        --border:    #2a2a30;
+        --border2:   #3a1a1a;
+        --red:       #c0392b;
+        --red2:      #e74c3c;
+        --red3:      #ff6b6b;
+        --red-glow:  rgba(192,57,43,0.18);
+        --red-soft:  rgba(192,57,43,0.10);
+        --text:      #e8e8ec;
+        --text2:     #9a9aaa;
+        --text3:     #5a5a6a;
+        --radius:    10px;
+        --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      }
+
+      body {
+        font-family: var(--font);
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      /* ── Sharingan background pattern ── */
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background-image:
+          radial-gradient(circle at 50% 0%, rgba(192,57,43,0.08) 0%, transparent 60%),
+          radial-gradient(circle at 0% 100%, rgba(120,20,10,0.06) 0%, transparent 50%);
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      /* ── LOGIN SCREEN ── */
+      #login-screen {
+        position: relative;
+        z-index: 1;
+        width: 100%;
+        max-width: 420px;
+        padding: 24px;
+      }
+
+      .logo-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-bottom: 32px;
+      }
+
+      .sharingan {
+        width: 72px;
+        height: 72px;
+        margin-bottom: 16px;
+        position: relative;
+      }
+
+      .logo-title {
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        color: var(--text);
+      }
+
+      .logo-title span { color: var(--red2); }
+
+      .logo-sub {
+        font-size: 13px;
+        color: var(--text3);
+        margin-top: 4px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .login-card {
+        background: var(--bg2);
+        border: 1px solid var(--border2);
+        border-radius: 16px;
+        padding: 32px;
+        box-shadow: 0 0 40px rgba(192,57,43,0.08), 0 8px 32px rgba(0,0,0,0.5);
+      }
+
+      .login-card h2 {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 24px;
+        color: var(--text2);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 12px;
+      }
+
+      .field {
+        margin-bottom: 16px;
+      }
+
+      .field label {
+        display: block;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text3);
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      .field input {
+        width: 100%;
+        background: var(--bg3);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 11px 14px;
+        font-size: 14px;
+        color: var(--text);
+        font-family: var(--font);
+        outline: none;
+        transition: border-color 0.2s;
+      }
+
+      .field input:focus {
+        border-color: var(--red);
+        box-shadow: 0 0 0 3px var(--red-soft);
+      }
+
+      .field input::placeholder { color: var(--text3); }
+
+      .error-msg {
+        display: none;
+        font-size: 12px;
+        color: var(--red3);
+        margin-top: 12px;
+        padding: 8px 12px;
+        background: rgba(192,57,43,0.12);
+        border: 1px solid rgba(192,57,43,0.25);
+        border-radius: 6px;
+      }
+
+      .error-msg.show { display: block; }
+
+      .btn-login {
+        width: 100%;
+        margin-top: 20px;
+        padding: 12px;
+        background: var(--red);
+        border: none;
+        border-radius: var(--radius);
+        color: #fff;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        font-family: var(--font);
+        letter-spacing: 0.04em;
+        transition: background 0.2s, transform 0.1s;
+      }
+
+      .btn-login:hover { background: var(--red2); }
+      .btn-login:active { transform: scale(0.98); }
+
+      /* ── DASHBOARD ── */
+      #dashboard {
+        display: none;
+        position: relative;
+        z-index: 1;
+        width: 100%;
+        max-width: 860px;
+        padding: 24px;
+      }
+
+      .dash-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 28px;
+      }
+
+      .dash-title-wrap {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+
+      .dash-title-wrap .sharingan { width: 40px; height: 40px; margin: 0; }
+
+      .dash-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--text);
+      }
+
+      .dash-title span { color: var(--red2); }
+
+      .badge-live {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(192,57,43,0.12);
+        border: 1px solid rgba(192,57,43,0.3);
+        border-radius: 20px;
+        padding: 4px 10px;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--red3);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      .badge-live::before {
+        content: '';
+        width: 6px; height: 6px;
+        border-radius: 50%;
+        background: var(--red3);
+        animation: pulse 1.5s infinite;
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+      }
+
+      .btn-logout {
+        background: transparent;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        color: var(--text3);
+        font-size: 12px;
+        padding: 7px 14px;
+        cursor: pointer;
+        font-family: var(--font);
+        transition: border-color 0.2s, color 0.2s;
+      }
+
+      .btn-logout:hover { border-color: var(--red); color: var(--red3); }
+
+      /* stat cards */
+      .stat-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 14px;
+        margin-bottom: 22px;
+      }
+
+      .stat-card {
+        background: var(--bg2);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 18px 20px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .stat-card::after {
+        content: '';
+        position: absolute;
+        top: 0; left: 0;
+        width: 3px; height: 100%;
+        background: var(--red);
+        border-radius: 3px 0 0 3px;
+      }
+
+      .stat-label {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--text3);
+        margin-bottom: 8px;
+      }
+
+      .stat-value {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--text);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .stat-value.red { color: var(--red2); }
+
+      /* feed */
+      .feed-wrap {
+        background: var(--bg2);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        overflow: hidden;
+      }
+
+      .feed-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg3);
+      }
+
+      .feed-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text2);
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+      }
+
+      .next-poll {
+        font-size: 12px;
+        color: var(--text3);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .next-poll span { color: var(--red3); font-weight: 600; }
+
+      .feed-list {
+        max-height: 360px;
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: var(--border) transparent;
+      }
+
+      .feed-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 48px 20px;
+        color: var(--text3);
+        font-size: 13px;
+        gap: 10px;
+      }
+
+      .feed-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border);
+        animation: fadeIn 0.3s ease;
+      }
+
+      .feed-item:last-child { border-bottom: none; }
+
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-6px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+
+      .feed-dot {
+        width: 8px; height: 8px;
+        border-radius: 50%;
+        background: var(--red);
+        margin-top: 5px;
+        flex-shrink: 0;
+      }
+
+      .feed-body { flex: 1; min-width: 0; }
+
+      .feed-otp {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--red3);
+        letter-spacing: 0.1em;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .feed-meta {
+        font-size: 11px;
+        color: var(--text3);
+        margin-top: 3px;
+      }
+
+      .feed-sent {
+        font-size: 11px;
+        color: #2ecc71;
+        align-self: center;
+        flex-shrink: 0;
+      }
+
+      /* info cards */
+      .info-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 14px;
+        margin-top: 18px;
+      }
+
+      .info-card {
+        background: var(--bg2);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px 18px;
+      }
+
+      .info-card-title {
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--text3);
+        margin-bottom: 6px;
+      }
+
+      .info-card-val {
+        font-size: 14px;
+        color: var(--text2);
+      }
+    </style>
+  </head>
+  <body>
+
+    <!-- ── LOGIN SCREEN ── -->
+    <div id="login-screen">
+      <div class="logo-wrap">
+        <!-- Sharingan SVG -->
+        <svg class="sharingan" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="36" cy="36" r="35" fill="#1a0606" stroke="#c0392b" stroke-width="1.5"/>
+          <circle cx="36" cy="36" r="26" fill="none" stroke="#7a1a0a" stroke-width="0.8"/>
+          <!-- outer tomoe -->
+          <g>
+            <ellipse cx="36" cy="14" rx="4" ry="6.5" fill="#c0392b" transform="rotate(0 36 36)"/>
+            <ellipse cx="36" cy="14" rx="4" ry="6.5" fill="#c0392b" transform="rotate(120 36 36)"/>
+            <ellipse cx="36" cy="14" rx="4" ry="6.5" fill="#c0392b" transform="rotate(240 36 36)"/>
+          </g>
+          <!-- inner ring -->
+          <circle cx="36" cy="36" r="14" fill="none" stroke="#c0392b" stroke-width="1.2"/>
+          <!-- inner tomoe (small) -->
+          <g>
+            <ellipse cx="36" cy="25" rx="2.5" ry="4" fill="#e74c3c" transform="rotate(0 36 36)"/>
+            <ellipse cx="36" cy="25" rx="2.5" ry="4" fill="#e74c3c" transform="rotate(120 36 36)"/>
+            <ellipse cx="36" cy="25" rx="2.5" ry="4" fill="#e74c3c" transform="rotate(240 36 36)"/>
+          </g>
+          <!-- pupil -->
+          <circle cx="36" cy="36" r="6" fill="#c0392b"/>
+          <circle cx="36" cy="36" r="3" fill="#0a0a0b"/>
+        </svg>
+        <div class="logo-title">ITACHI <span>OTP</span></div>
+        <div class="logo-sub">Telegram Relay System</div>
+      </div>
+
+      <div class="login-card">
+        <h2>Authentication required</h2>
+
+        <div class="field">
+          <label for="inp-user">Username</label>
+          <input type="text" id="inp-user" placeholder="Enter username" autocomplete="username" />
         </div>
-      </section>
-    </main>
+
+        <div class="field">
+          <label for="inp-pass">Password</label>
+          <input type="password" id="inp-pass" placeholder="Enter password" autocomplete="current-password" />
+        </div>
+
+        <div class="error-msg" id="login-error">Invalid username or password.</div>
+
+        <button class="btn-login" id="btn-login">Access System</button>
+      </div>
+    </div>
+
+    <!-- ── DASHBOARD ── -->
+    <div id="dashboard">
+      <div class="dash-header">
+        <div class="dash-title-wrap">
+          <svg class="sharingan" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="36" cy="36" r="35" fill="#1a0606" stroke="#c0392b" stroke-width="1.5"/>
+            <circle cx="36" cy="36" r="26" fill="none" stroke="#7a1a0a" stroke-width="0.8"/>
+            <g>
+              <ellipse cx="36" cy="14" rx="4" ry="6.5" fill="#c0392b" transform="rotate(0 36 36)"/>
+              <ellipse cx="36" cy="14" rx="4" ry="6.5" fill="#c0392b" transform="rotate(120 36 36)"/>
+              <ellipse cx="36" cy="14" rx="4" ry="6.5" fill="#c0392b" transform="rotate(240 36 36)"/>
+            </g>
+            <circle cx="36" cy="36" r="14" fill="none" stroke="#c0392b" stroke-width="1.2"/>
+            <g>
+              <ellipse cx="36" cy="25" rx="2.5" ry="4" fill="#e74c3c" transform="rotate(0 36 36)"/>
+              <ellipse cx="36" cy="25" rx="2.5" ry="4" fill="#e74c3c" transform="rotate(120 36 36)"/>
+              <ellipse cx="36" cy="25" rx="2.5" ry="4" fill="#e74c3c" transform="rotate(240 36 36)"/>
+            </g>
+            <circle cx="36" cy="36" r="6" fill="#c0392b"/>
+            <circle cx="36" cy="36" r="3" fill="#0a0a0b"/>
+          </svg>
+          <div>
+            <div class="dash-title">ITACHI <span>OTP</span></div>
+          </div>
+          <div class="badge-live">Live</div>
+        </div>
+        <button class="btn-logout" id="btn-logout">Sign out</button>
+      </div>
+
+      <!-- stats -->
+      <div class="stat-row">
+        <div class="stat-card">
+          <div class="stat-label">OTPs Forwarded</div>
+          <div class="stat-value red" id="stat-forwarded">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Poll Interval</div>
+          <div class="stat-value">30s</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Status</div>
+          <div class="stat-value" style="font-size:15px; padding-top:5px; color:#2ecc71;">Running</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Next Poll</div>
+          <div class="stat-value red" id="stat-countdown" style="font-size:22px;">30s</div>
+        </div>
+      </div>
+
+      <!-- OTP feed -->
+      <div class="feed-wrap">
+        <div class="feed-header">
+          <div class="feed-title">OTP Feed</div>
+          <div class="next-poll">Next poll in <span id="feed-countdown">30s</span></div>
+        </div>
+        <div class="feed-list" id="feed-list">
+          <div class="feed-empty" id="feed-empty">
+            <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="#5a5a6a" stroke-width="1.5">
+              <circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/>
+            </svg>
+            Waiting for first OTP poll…
+          </div>
+        </div>
+      </div>
+
+      <!-- info row -->
+      <div class="info-row">
+        <div class="info-card">
+          <div class="info-card-title">Delivery</div>
+          <div class="info-card-val">OTP-only — empty messages are skipped</div>
+        </div>
+        <div class="info-card">
+          <div class="info-card-title">Targets</div>
+          <div class="info-card-val">Comma-separated Telegram chat IDs</div>
+        </div>
+        <div class="info-card">
+          <div class="info-card-title">Source</div>
+          <div class="info-card-val">CR API · viewstats endpoint</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // ── CREDENTIALS — change these ──
+      const VALID_USERNAME = 'itachi';
+      const VALID_PASSWORD = 'sharingan123';
+
+      // ── STATE ──
+      let forwarded = 0;
+      let countdown = 30;
+      let timer = null;
+      let feedItems = [];
+
+      // ── LOGIN ──
+      const loginScreen  = document.getElementById('login-screen');
+      const dashboard    = document.getElementById('dashboard');
+      const btnLogin     = document.getElementById('btn-login');
+      const btnLogout    = document.getElementById('btn-logout');
+      const inpUser      = document.getElementById('inp-user');
+      const inpPass      = document.getElementById('inp-pass');
+      const loginError   = document.getElementById('login-error');
+
+      function doLogin() {
+        const u = inpUser.value.trim();
+        const p = inpPass.value;
+        if (!u || !p) {
+          loginError.textContent = 'Please enter both username and password.';
+          loginError.classList.add('show');
+          return;
+        }
+        if (u === VALID_USERNAME && p === VALID_PASSWORD) {
+          loginError.classList.remove('show');
+          loginScreen.style.display = 'none';
+          dashboard.style.display   = 'block';
+          startDashboard();
+        } else {
+          loginError.textContent = 'Invalid username or password.';
+          loginError.classList.add('show');
+          inpPass.value = '';
+          inpPass.focus();
+        }
+      }
+
+      btnLogin.addEventListener('click', doLogin);
+      inpPass.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+      inpUser.addEventListener('keydown', e => { if (e.key === 'Enter') inpPass.focus(); });
+      inpUser.addEventListener('input', () => loginError.classList.remove('show'));
+      inpPass.addEventListener('input', () => loginError.classList.remove('show'));
+
+      btnLogout.addEventListener('click', () => {
+        clearInterval(timer);
+        dashboard.style.display   = 'none';
+        loginScreen.style.display = '';
+        inpUser.value = '';
+        inpPass.value = '';
+        forwarded = 0;
+        countdown = 30;
+        feedItems = [];
+        document.getElementById('feed-list').innerHTML =
+          '<div class="feed-empty" id="feed-empty"><svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="#5a5a6a" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>Waiting for first OTP poll…</div>';
+        document.getElementById('stat-forwarded').textContent = '0';
+        updateCountdown();
+      });
+
+      // ── DASHBOARD ──
+      function updateCountdown() {
+        document.getElementById('stat-countdown').textContent = countdown + 's';
+        document.getElementById('feed-countdown').textContent = countdown + 's';
+      }
+
+      function addFeedItem(otp) {
+        const empty = document.getElementById('feed-empty');
+        if (empty) empty.remove();
+
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString();
+
+        forwarded++;
+        document.getElementById('stat-forwarded').textContent = forwarded;
+
+        const item = document.createElement('div');
+        item.className = 'feed-item';
+        item.innerHTML = `
+          <div class="feed-dot"></div>
+          <div class="feed-body">
+            <div class="feed-otp">${otp}</div>
+            <div class="feed-meta">Received at ${timeStr}</div>
+          </div>
+          <div class="feed-sent">✓ Sent</div>
+        `;
+        const list = document.getElementById('feed-list');
+        list.insertBefore(item, list.firstChild);
+      }
+
+      function simulatePoll() {
+        // In production this is handled by fetch-and-send-otp.js (Node.js).
+        // This dashboard shows live status updates — replace with a real
+        // status endpoint if you add one to your backend.
+        // For demo purposes, randomly simulate an OTP arriving.
+        const hasOtp = Math.random() > 0.55;
+        if (hasOtp) {
+          const otp = String(Math.floor(100000 + Math.random() * 900000));
+          addFeedItem(otp);
+        }
+      }
+
+      function startDashboard() {
+        countdown = 30;
+        updateCountdown();
+        clearInterval(timer);
+        timer = setInterval(() => {
+          countdown--;
+          if (countdown <= 0) {
+            countdown = 30;
+            simulatePoll();
+          }
+          updateCountdown();
+        }, 1000);
+      }
+    </script>
   </body>
 </html>
