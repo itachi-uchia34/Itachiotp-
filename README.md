@@ -24,11 +24,11 @@ Railway can deploy this repository with the included `railway.json`, which runs 
 
 If the deployment log says `ADMIN_PASSWORD must contain at least 10 characters`, open Railway **Variables**, replace `ADMIN_PASSWORD` with a value of at least 10 characters, save the variables, and redeploy. Do not include quotation marks around the value, and do not use the placeholder from `.env.example`.
 
-The browser dashboard is not required to remain open for forwarding to continue. Do not deploy multiple replicas of this service because each replica would run its own polling workers; use one service instance with one persistent volume.
+The login screen includes separate **Administrator login** and **New user login** modes. Applicants can request a username and receive a random one-time approval key that expires after 30 minutes. They send that key to the administrator through the built-in WhatsApp contact button for **923110470403**. The administrator enters the key in the **Approve registration request** panel; only then can the applicant create a password and complete registration. Administrators can also create team accounts directly from the User accounts panel. The browser dashboard is not required to remain open for forwarding to continue. Do not deploy multiple replicas of this service because each replica would run its own polling workers; use one service instance with one persistent volume.
 
 ## Persistence and deployment
 
-The default Node process must be supervised by the deployment platform. The included restart policy handles process failures. Persist `auth-users.json`, `runtime-user-settings.json`, and `runtime-status.json` on durable storage; losing the encrypted settings file removes the saved account credentials, while losing the status file only resets operational history and duplicate fingerprints.
+The default Node process must be supervised by the deployment platform. The included restart policy handles process failures. Persist `auth-users.json`, `registration-requests.json`, `runtime-user-settings.json`, and `runtime-status.json` on durable storage; losing the encrypted settings file removes the saved account credentials, while losing the status file only resets operational history and duplicate fingerprints. Registration approval keys are stored only as SHA-256 hashes, not in plaintext.
 
 ## Security
 
@@ -36,7 +36,7 @@ The `.env` file and all runtime JSON stores are ignored by Git. Rotate any CR AP
 
 ## Verification
 
-The regression suite covers numeric OTP extraction, empty-message suppression, message formatting, two-user Telegram isolation, duplicate suppression, and encrypted per-user settings. Run it with `npm test` before deployment.
+The regression suite covers numeric OTP extraction, empty-message suppression, message formatting, two-user Telegram isolation, duplicate suppression, encrypted per-user settings, masked forwarding activity, and approved registration completion. Run it with `npm test` before deployment.
 
 ## References
 

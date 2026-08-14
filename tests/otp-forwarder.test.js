@@ -3,8 +3,11 @@ const assert = require('node:assert/strict');
 const {
   createForwarder,
   extractOtpValues,
+  buildForwardingActivity,
   formatTelegramText,
+  maskPhoneNumber,
 } = require('../fetch-and-send-otp.js');
+const { readState } = require('../runtime-state');
 
 test('extracts only numeric OTP values from OTP-labelled fields', () => {
   const values = extractOtpValues({ data: { otp: '482913', message: 'Your OTP is 7744', username: 'not-an-otp' } });
@@ -20,6 +23,28 @@ test('returns no values for empty or unrelated API responses', () => {
 test('formats a non-empty Telegram message only when OTP values exist', () => {
   const message = formatTelegramText(['1234', '987654']);
   assert.match(message, /^OTP Update\nTime: .+\n1234, 987654$/);
+});
+
+test('masks phone numbers and adds a country flag without exposing the full number', () => {
+  const activity = buildForwardingActivity({ data: { sender: '+923451237453', message: 'Your OTP is 482913' } }, '2026-08-15T00:00:00.000Z');
+  assert.equal(activity.flag, '🇵🇰');
+  assert.equal(activity.phone, '92345xxx7453');
+  assert.equal(activity.at, '2026-08-15T00:00:00.000Z');
+  assert.doesNotMatch(JSON.stringify(activity), /923451237453/);
+  assert.equal(maskPhoneNumber(''), 'Unknown number');
+});
+
+test('worker activity contains only a masked number and flag', async () => {
+  const username = `activity-${Date.now()}`;
+  const mockFetch = async (url, options = {}) => {
+    if (url.startsWith('https://api.telegram.org')) return { ok: true, json: async () => ({ ok: true }) };
+    return { ok: true, text: async () => JSON.stringify({ sender: '+923451237453', otp: '482913' }) };
+  };
+  const worker = createForwarder({ username, settingsProvider: () => ({ CRAPI_TOKEN: 'token', TELEGRAM_BOT_TOKEN: 'bot', TELEGRAM_CHAT_IDS: 'chat' }), fetchImpl: mockFetch });
+  const result = await worker.runOnce();
+  assert.equal(result.sent, true);
+  assert.deepEqual(result.activity, { at: result.activity.at, flag: '🇵🇰', countryCode: 'PK', phone: '92345xxx7453' });
+  assert.doesNotMatch(JSON.stringify(readState(username)), /923451237453|482913/);
 });
 
 test('isolates two user workers and suppresses repeated OTPs', async () => {

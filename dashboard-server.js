@@ -74,6 +74,16 @@ async function startDashboardServer() {
       if (req.method === 'GET' && req.url === '/health') {
         return sendJson(res, 200, { ok: true, service: 'itachi-otp-forwarder' });
       }
+      if (req.method === 'POST' && req.url === '/api/register/request') {
+        const body = await readJsonBody(req);
+        const request = auth.requestRegistration(body.username);
+        return sendJson(res, 201, { requested: true, request, whatsappNumber: '923110470403' });
+      }
+      if (req.method === 'POST' && req.url === '/api/register/complete') {
+        const body = await readJsonBody(req);
+        const user = auth.completeRegistration(body.username, body.password, body.approvalKey);
+        return sendJson(res, 201, { registered: true, user });
+      }
       if (req.method === 'POST' && req.url === '/api/login') {
         const body = await readJsonBody(req);
         const result = auth.login(body.username, body.password);
@@ -107,6 +117,15 @@ async function startDashboardServer() {
         if (!requireAdmin(req, res)) return;
         return sendJson(res, 200, { users: auth.listUsers() });
       }
+      if (req.method === 'GET' && req.url === '/api/registration-requests') {
+        if (!requireAdmin(req, res)) return;
+        return sendJson(res, 200, { requests: auth.listRegistrationRequests() });
+      }
+      if (req.method === 'POST' && req.url === '/api/registration-requests/approve') {
+        if (!requireAdmin(req, res)) return;
+        const body = await readJsonBody(req);
+        return sendJson(res, 200, { approved: true, request: auth.approveRegistration(body.approvalKey) });
+      }
       if (req.method === 'POST' && req.url === '/api/users') {
         if (!requireAdmin(req, res)) return;
         const body = await readJsonBody(req);
@@ -125,8 +144,9 @@ async function startDashboardServer() {
       }
       return sendJson(res, 404, { error: 'Not found' });
     } catch (error) {
-      const status = error.message && /Invalid username|Too many login/.test(error.message) ? 401 : 500;
-      return sendJson(res, status, { error: error.message || 'Internal server error' });
+      const message = error.message || 'Internal server error';
+      const status = /Invalid username|Too many login/.test(message) ? 401 : /required|invalid|already|must|pending|approved/i.test(message) ? 400 : 500;
+      return sendJson(res, status, { error: message });
     }
   });
   const port = Number(process.env.PORT || 3000);

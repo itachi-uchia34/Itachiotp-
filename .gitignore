@@ -8,4 +8,5 @@ runtime-status.json
 runtime-settings.json
 runtime-user-settings.json
 auth-users.json
+registration-requests.json
 data/
