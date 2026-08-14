@@ -22,6 +22,8 @@ The service starts the HTTP dashboard and then discovers all accounts in `auth-u
 
 Railway can deploy this repository with the included `railway.json`, which runs `npm start`, checks `/health`, and restarts the service after failure. Add the required variables from `.env.example` in the Railway service settings: `CRAPI_TOKEN`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, and `SETTINGS_ENCRYPTION_KEY`. Add a Railway Volume and mount it at `/app/data`; the application automatically uses Railway’s `RAILWAY_VOLUME_MOUNT_PATH` value and persists accounts, encrypted Telegram settings, and worker state there. Railway documents that relative application data must be mounted under the application path, such as `/app/data`, for it to persist across deployments [1].
 
+If the deployment log says `ADMIN_PASSWORD must contain at least 10 characters`, open Railway **Variables**, replace `ADMIN_PASSWORD` with a value of at least 10 characters, save the variables, and redeploy. Do not include quotation marks around the value, and do not use the placeholder from `.env.example`.
+
 The browser dashboard is not required to remain open for forwarding to continue. Do not deploy multiple replicas of this service because each replica would run its own polling workers; use one service instance with one persistent volume.
 
 ## Persistence and deployment

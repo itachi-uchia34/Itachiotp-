@@ -5,7 +5,10 @@ function validateProductionConfig() {
   const required = ['CRAPI_TOKEN', 'ADMIN_USERNAME', 'ADMIN_PASSWORD', 'SETTINGS_ENCRYPTION_KEY'];
   const missing = required.filter((name) => !String(process.env[name] || '').trim());
   if (missing.length) throw new Error(`Missing required production environment variables: ${missing.join(', ')}`);
-  if (String(process.env.ADMIN_PASSWORD).length < 10) throw new Error('ADMIN_PASSWORD must contain at least 10 characters.');
+  const adminPasswordLength = String(process.env.ADMIN_PASSWORD || '').trim().length;
+  if (adminPasswordLength < 10) {
+    throw new Error(`ADMIN_PASSWORD must contain at least 10 characters (received ${adminPasswordLength}). Update the Railway variable and redeploy.`);
+  }
 }
 
 try {
