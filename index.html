@@ -3,35 +3,67 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Itachi OTP Forwarder</title>
+    <title>Itachi OTP Forwarder Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      :root { color-scheme: dark; }
+      body { background: radial-gradient(circle at 50% -10%, rgba(127, 29, 29, .34), transparent 38%), linear-gradient(135deg, #030303 0%, #0b0b0f 48%, #160607 100%); }
+      .itachi-panel { background: linear-gradient(145deg, rgba(18, 18, 23, .94), rgba(8, 8, 10, .94)); border-color: rgba(127, 29, 29, .42); box-shadow: 0 20px 70px rgba(0, 0, 0, .28), inset 0 1px rgba(255, 255, 255, .03); }
+      .itachi-panel:hover { border-color: rgba(185, 28, 28, .72); }
+      .itachi-label { color: #d1d5db; letter-spacing: .03em; }
+      .itachi-input { border-color: #3f2024 !important; background: #070709 !important; }
+      .itachi-input:focus { border-color: #dc2626 !important; box-shadow: 0 0 0 2px rgba(220, 38, 38, .18); }
+      .itachi-red { color: #fca5a5; }
+      .itachi-button { background: linear-gradient(135deg, #991b1b, #450a0a); color: #fee2e2; border: 1px solid rgba(248, 113, 113, .35); box-shadow: 0 8px 24px rgba(127, 29, 29, .2); }
+      .itachi-button:hover { background: linear-gradient(135deg, #b91c1c, #7f1d1d); }
+      .sharingan { position: relative; width: 54px; height: 54px; border: 2px solid #f87171; border-radius: 50%; background: radial-gradient(circle, #09090b 0 13%, #dc2626 14% 43%, #09090b 44% 49%, #991b1b 50% 100%); box-shadow: 0 0 22px rgba(220, 38, 38, .4); }
+      .sharingan::before, .sharingan::after { content: ''; position: absolute; width: 8px; height: 8px; border-radius: 50%; background: #030303; box-shadow: 0 0 0 3px #dc2626; }
+      .sharingan::before { top: 7px; left: 8px; } .sharingan::after { right: 8px; bottom: 7px; }
+      .brand-line { height: 1px; background: linear-gradient(90deg, transparent, #991b1b, transparent); }
+      .eyebrow { color: #fca5a5; letter-spacing: .3em; }
+    </style>
   </head>
-  <body class="min-h-screen bg-slate-950 text-slate-100">
-    <main class="mx-auto flex min-h-screen max-w-3xl items-center px-6 py-12">
-      <section class="w-full rounded-2xl border border-slate-800 bg-slate-900/60 p-8 shadow-2xl shadow-black/30">
-        <p class="mb-2 inline-flex rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-300">
-          Live OTP Forwarder
-        </p>
-        <h1 class="text-3xl font-bold tracking-tight">Telegram OTP Relay</h1>
-        <p class="mt-3 text-slate-300">
-          This service fetches OTP values from the CR API and forwards them to one or more Telegram chat IDs every 30 seconds.
-        </p>
+  <body class="min-h-screen text-slate-100">
+    <main class="mx-auto min-h-screen max-w-5xl px-5 py-10 sm:px-8">
+      <header class="flex flex-col gap-5 border-b border-red-950/70 pb-8 sm:flex-row sm:items-end sm:justify-between">
+        <div class="flex items-center gap-4"><div class="sharingan" aria-hidden="true"></div><div><p class="eyebrow mb-2 text-[10px] font-semibold uppercase">Akatsuki operations</p><h1 class="text-3xl font-black tracking-tight text-red-50 sm:text-4xl">Itachi OTP Forwarder</h1><p class="mt-3 max-w-2xl text-slate-400">The shadows watch the CR API. New OTPs are forwarded to Telegram without displaying their contents here.</p></div></div>
+        <div class="flex items-center gap-3"><span id="connectionBadge" class="rounded-full border border-red-950 px-4 py-2 text-sm text-slate-400">Signed out</span><button id="logoutButton" class="itachi-button hidden rounded-xl px-4 py-2 text-sm">Logout</button></div>
+      </header>
 
-        <div class="mt-6 grid gap-4 sm:grid-cols-3">
-          <article class="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
-            <h2 class="text-sm font-semibold text-slate-200">Polling</h2>
-            <p class="mt-2 text-sm text-slate-400">Runs every 30 seconds.</p>
-          </article>
-          <article class="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
-            <h2 class="text-sm font-semibold text-slate-200">Delivery</h2>
-            <p class="mt-2 text-sm text-slate-400">Sends OTP-only updates to Telegram.</p>
-          </article>
-          <article class="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
-            <h2 class="text-sm font-semibold text-slate-200">Multi-chat</h2>
-            <p class="mt-2 text-sm text-slate-400">Supports comma-separated chat IDs.</p>
-          </article>
-        </div>
+      <div class="brand-line mt-8"></div>
+      <section id="loginPanel" class="itachi-panel mx-auto mt-12 max-w-md rounded-2xl border p-6">
+        <p class="eyebrow text-[10px] font-semibold uppercase">Genjutsu gate</p><h2 class="mt-2 text-xl font-semibold text-red-50">Account login</h2><p class="mt-2 text-sm text-slate-400">Enter your account credentials to operate your isolated OTP worker. Passwords and tokens are never shown or stored in the browser.</p>
+        <label class="itachi-label mt-5 block text-sm font-medium">Username<input id="username" autocomplete="username" class="itachi-input mt-2 w-full rounded-xl border px-4 py-3 outline-none" /></label>
+        <label class="itachi-label mt-4 block text-sm font-medium">Password<input id="password" type="password" autocomplete="current-password" class="itachi-input mt-2 w-full rounded-xl border px-4 py-3 outline-none" /></label>
+        <button id="loginButton" class="itachi-button mt-5 w-full rounded-xl px-5 py-3 font-semibold">Enter the shadows</button><p id="loginMessage" class="mt-4 min-h-5 text-sm text-rose-300"></p>
       </section>
+
+      <div id="dashboardPanel" class="hidden">
+        <section class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><article class="itachi-panel rounded-2xl border p-5"><p class="text-sm text-slate-400">Last result</p><p id="lastResult" class="mt-2 text-xl font-semibold">—</p></article><article class="itachi-panel rounded-2xl border p-5"><p class="text-sm text-slate-400">Last poll</p><p id="lastPoll" class="mt-2 text-xl font-semibold">—</p></article><article class="itachi-panel rounded-2xl border p-5"><p class="text-sm text-slate-400">Last delivery</p><p id="lastSend" class="mt-2 text-xl font-semibold">—</p></article><article class="itachi-panel rounded-2xl border p-5"><p class="text-sm text-slate-400">Sent count</p><p id="sentCount" class="mt-2 text-xl font-semibold">0</p></article></section>
+        <section class="mt-6 grid gap-6 lg:grid-cols-2"><article class="itachi-panel rounded-2xl border p-6"><h2 class="text-lg font-semibold">Configuration readiness</h2><div id="configList" class="mt-4 space-y-3 text-sm"></div></article><article class="itachi-panel rounded-2xl border p-6"><h2 class="text-lg font-semibold">Operations</h2><p class="mt-2 text-sm text-slate-400">Run one immediate poll. OTP values are never displayed.</p><button id="pollButton" class="itachi-button mt-5 rounded-xl px-5 py-3 font-semibold">Run poll now</button><p id="errorText" class="mt-4 min-h-5 text-sm text-rose-300"></p></article></section>
+
+        <section id="settingsPanel" class="mt-6 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-6"><h2 class="text-lg font-semibold text-amber-100">Secure settings</h2><p class="mt-2 text-sm text-amber-100/70">Your private worker settings. Leave a field blank to keep its saved value.</p><div class="mt-5 grid gap-4 sm:grid-cols-2"><label class="text-sm font-medium text-slate-300">Telegram bot token<input id="telegramBotToken" type="password" autocomplete="new-password" class="itachi-input mt-2 w-full rounded-xl border px-4 py-3" /></label><label class="text-sm font-medium text-slate-300">Telegram chat IDs<input id="telegramChatIds" placeholder="123456789,-1001234567890" class="itachi-input mt-2 w-full rounded-xl border px-4 py-3" /></label></div><div class="mt-5 flex items-center gap-3"><button id="saveSettingsButton" class="itachi-button rounded-xl px-5 py-3 font-semibold">Save settings</button><span id="settingsMessage" class="text-sm text-slate-400"></span></div></section>
+
+        <section id="usersPanel" class="mt-6 rounded-2xl border border-sky-500/20 bg-sky-500/5 p-6"><div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div><h2 class="text-lg font-semibold text-sky-100">User accounts</h2><p class="mt-1 text-sm text-sky-100/70">Only administrators can create new dashboard users.</p></div><button id="refreshUsersButton" class="itachi-button rounded-xl px-4 py-2 text-sm">Refresh</button></div><div class="mt-5 grid gap-4 sm:grid-cols-2"><label class="text-sm font-medium text-slate-300">New username<input id="newUsername" autocomplete="off" class="itachi-input mt-2 w-full rounded-xl border px-4 py-3" /></label><label class="text-sm font-medium text-slate-300">Temporary password<input id="newPassword" type="password" autocomplete="new-password" class="itachi-input mt-2 w-full rounded-xl border px-4 py-3" /></label></div><div class="mt-5 flex items-center gap-3"><button id="createUserButton" class="itachi-button rounded-xl px-5 py-3 font-semibold">Create user</button><span id="userMessage" class="text-sm text-slate-400"></span></div><div id="usersList" class="mt-5 space-y-2 text-sm"></div></section>
+      </div>
+      <footer class="mt-8 text-center text-xs text-slate-600">Keep this dashboard private. Passwords are hashed server-side; OTP values and token contents are never displayed.</footer>
     </main>
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const badge = $('connectionBadge');
+      function formatTime(value) { return value ? new Date(value).toLocaleString() : '—'; }
+      function setStatus(data) { $('lastResult').textContent = data.lastResult || '—'; $('lastPoll').textContent = formatTime(data.lastPollAt); $('lastSend').textContent = formatTime(data.lastSendAt); $('sentCount').textContent = String(data.sentCount || 0); $('configList').innerHTML = Object.entries({'Telegram bot token': data.configured.telegramBotToken, 'Telegram chat IDs': data.configured.telegramChatIds}).map(([name, ready]) => `<div class="flex justify-between rounded-lg border border-slate-800 px-3 py-2"><span class="text-slate-400">${name}</span><span class="${ready ? 'text-emerald-300' : 'text-rose-300'}">${ready ? 'Ready' : 'Missing'}</span></div>`).join(''); $('errorText').textContent = data.error || ''; }
+      async function request(url, options = {}) { const response = await fetch(url, { credentials: 'same-origin', ...options }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Request failed'); return data; }
+      function showDashboard(user) { $('loginPanel').classList.add('hidden'); $('dashboardPanel').classList.remove('hidden'); $('logoutButton').classList.remove('hidden'); badge.textContent = `${user.username} (${user.role})`; badge.className = 'rounded-full border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-300'; if (user.role !== 'admin') { $('usersPanel').classList.add('hidden'); } }
+      async function loadDashboard(user) { showDashboard(user); setStatus(await request('/api/status')); const settings = await request('/api/my-settings'); const masked = settings.masked || {}; $('telegramBotToken').placeholder = masked.TELEGRAM_BOT_TOKEN || masked.telegramBotToken ? 'Saved: ••••••••' : 'Leave blank to keep saved value'; if (user.role === 'admin') await loadUsers(); }
+      async function login() { $('loginMessage').textContent = ''; try { const data = await request('/api/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ username: $('username').value, password: $('password').value }) }); $('password').value = ''; await loadDashboard(data.user); } catch (error) { $('loginMessage').textContent = error.message; } }
+      async function loadUsers() { try { const data = await request('/api/users'); $('usersList').innerHTML = data.users.map((user) => `<div class="flex justify-between rounded-lg border border-slate-800 px-3 py-2"><span>${user.username}</span><span class="text-slate-400">${user.role}</span></div>`).join(''); } catch (error) { $('userMessage').textContent = error.message; } }
+      $('loginButton').addEventListener('click', login); $('password').addEventListener('keydown', (event) => { if (event.key === 'Enter') login(); });
+      $('logoutButton').addEventListener('click', async () => { await request('/api/logout', {method: 'POST'}); location.reload(); });
+      $('pollButton').addEventListener('click', async () => { try { const data = await request('/api/poll', {method: 'POST'}); setStatus(data.status); $('errorText').textContent = data.sent ? 'A new OTP was forwarded.' : `No message sent: ${data.reason}.`; } catch (error) { $('errorText').textContent = error.message; } });
+      $('saveSettingsButton').addEventListener('click', async () => { try { const data = await request('/api/settings', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({telegramBotToken: $('telegramBotToken').value, telegramChatIds: $('telegramChatIds').value})}); ['telegramBotToken','telegramChatIds'].forEach((id) => $(id).value = ''); $('settingsMessage').textContent = 'Settings saved securely.'; setStatus(data.status); } catch (error) { $('settingsMessage').textContent = error.message; } });
+      $('createUserButton').addEventListener('click', async () => { try { const data = await request('/api/users', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({username: $('newUsername').value, password: $('newPassword').value})}); $('newUsername').value = ''; $('newPassword').value = ''; $('userMessage').textContent = `Created ${data.user.username}.`; await loadUsers(); } catch (error) { $('userMessage').textContent = error.message; } }); $('refreshUsersButton').addEventListener('click', loadUsers);
+      (async () => { try { const data = await request('/api/me'); await loadDashboard(data.user); } catch { /* Show login form. */ } })();
+    </script>
   </body>
 </html>
