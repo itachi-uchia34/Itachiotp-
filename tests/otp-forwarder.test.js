@@ -5,6 +5,7 @@ const {
   extractOtpValues,
   buildForwardingActivity,
   formatTelegramText,
+  buildOtpRecords,
   maskPhoneNumber,
 } = require('../fetch-and-send-otp.js');
 const { readState } = require('../runtime-state');
@@ -20,9 +21,35 @@ test('returns no values for empty or unrelated API responses', () => {
   assert.equal(formatTelegramText([]), '');
 });
 
-test('formats a non-empty Telegram message only when OTP values exist', () => {
-  const message = formatTelegramText(['1234', '987654']);
-  assert.match(message, /^OTP Update\nTime: .+\n1234, 987654$/);
+test('formats a non-empty Telegram message only when OTP values have a number', () => {
+  assert.equal(formatTelegramText(['1234', '987654']), '');
+  const message = formatTelegramText(['1234', '987654'], '+923451237453');
+  assert.match(message, /^OTP Update\nTime: .+\nNumber: \+923451237453\nOTP: 1234, 987654\nRange: Unknown range\nService: Unknown service$/);
+});
+
+test('builds no record when an OTP has no associated number', () => {
+  assert.deepEqual(buildOtpRecords({ otp: '482913' }), []);
+  assert.deepEqual(buildOtpRecords({ message: 'Your OTP is 482913. Reference 923451237453' }), []);
+  assert.deepEqual(buildOtpRecords({ sender: '+923451237453', message: 'Your OTP is 482913' }, '2026-08-15T00:00:00.000Z'), [{ otp: '482913', phone: '923451237453', range: 'Unknown range', service: 'Unknown service', at: '2026-08-15T00:00:00.000Z' }]);
+  assert.deepEqual(buildOtpRecords({ sender: '+923451237453', otp: '482913', active_range: '923450000000-923459999999', service_name: 'WhatsApp' }, '2026-08-15T00:00:00.000Z'), [{ otp: '482913', phone: '923451237453', range: '923450000000-923459999999', service: 'WhatsApp', at: '2026-08-15T00:00:00.000Z' }]);
+});
+
+test('does not forward an OTP when the source number is missing', async () => {
+  let telegramCalls = 0;
+  const worker = createForwarder({
+    username: `missing-number-${Date.now()}`,
+    settingsProvider: () => ({ CRAPI_TOKEN: 'token', TELEGRAM_BOT_TOKEN: 'bot', TELEGRAM_CHAT_IDS: 'chat' }),
+    fetchImpl: async (url) => {
+      if (url.startsWith('https://api.telegram.org')) {
+        telegramCalls += 1;
+        return { ok: true, json: async () => ({ ok: true }) };
+      }
+      return { ok: true, text: async () => JSON.stringify({ otp: '482913' }) };
+    },
+  });
+  const result = await worker.runOnce();
+  assert.deepEqual(result, { sent: false, reason: 'no-number' });
+  assert.equal(telegramCalls, 0);
 });
 
 test('masks phone numbers and adds a country flag without exposing the full number', () => {
@@ -44,7 +71,10 @@ test('worker activity contains only a masked number and flag', async () => {
   const result = await worker.runOnce();
   assert.equal(result.sent, true);
   assert.deepEqual(result.activity, { at: result.activity.at, flag: '🇵🇰', countryCode: 'PK', phone: '92345xxx7453' });
-  assert.doesNotMatch(JSON.stringify(readState(username)), /923451237453|482913/);
+  assert.deepEqual(result.records, [{ otp: '482913', phone: '923451237453', range: 'Unknown range', service: 'Unknown service', at: result.records[0].at }]);
+  const state = readState(username);
+  assert.deepEqual(state.recentOtpRecords, [{ otp: '482913', phone: '923451237453', range: 'Unknown range', service: 'Unknown service', at: result.records[0].at }]);
+  assert.doesNotMatch(JSON.stringify(state.recentActivity), /923451237453|482913/);
 });
 
 test('isolates two user workers and suppresses repeated OTPs', async () => {
@@ -56,7 +86,7 @@ test('isolates two user workers and suppresses repeated OTPs', async () => {
       return { ok: true, json: async () => ({ ok: true }) };
     }
     const token = new URL(url).searchParams.get('token');
-    return { ok: true, text: async () => JSON.stringify({ latest_otp: responses[token] }) };
+    return { ok: true, text: async () => JSON.stringify({ sender: token === 'tokenA' ? '+923001111111' : '+923002222222', latest_otp: responses[token] }) };
   };
   const settings = {
     userA: { CRAPI_TOKEN: 'tokenA', TELEGRAM_BOT_TOKEN: 'botA', TELEGRAM_CHAT_IDS: 'chatA' },

@@ -50,9 +50,81 @@ function extractOtpValues(apiResponse) {
   return [...deepCollectOtpValues(apiResponse)].filter((code) => /^\d{4,8}$/.test(code));
 }
 
-function formatTelegramText(otpValues) {
-  if (!otpValues.length) return '';
-  return ['OTP Update', `Time: ${new Date().toISOString()}`, otpValues.join(', ')].join('\n');
+function normalizeMetadataValue(value) {
+  if (value == null) return '';
+  if (Array.isArray(value)) return value.map(normalizeMetadataValue).filter(Boolean).join(', ').slice(0, 160);
+  if (typeof value === 'object') {
+    const from = normalizeMetadataValue(value.from ?? value.start ?? value.rangeStart ?? value.min);
+    const to = normalizeMetadataValue(value.to ?? value.end ?? value.rangeEnd ?? value.max);
+    if (from && to) return `${from}-${to}`.slice(0, 160);
+    for (const key of ['name', 'label', 'value', 'text', 'range', 'service']) {
+      const nested = normalizeMetadataValue(value[key]);
+      if (nested) return nested;
+    }
+    return '';
+  }
+  return String(value).trim().replace(/\s+/g, ' ').slice(0, 160);
+}
+
+function normalizedKey(key) {
+  return String(key).toLowerCase().replace(/[\s-]+/g, '_');
+}
+
+function findMetadataValue(value, keyPattern) {
+  if (value == null) return '';
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findMetadataValue(item, keyPattern);
+      if (found) return found;
+    }
+    return '';
+  }
+  if (typeof value !== 'object') return '';
+  for (const [key, nested] of Object.entries(value)) {
+    if (keyPattern.test(normalizedKey(key))) {
+      const found = normalizeMetadataValue(nested);
+      if (found) return found;
+    }
+  }
+  for (const nested of Object.values(value)) {
+    const found = findMetadataValue(nested, keyPattern);
+    if (found) return found;
+  }
+  return '';
+}
+
+function extractActiveRange(apiResponse) {
+  const directRange = findMetadataValue(apiResponse, /(^|_)(active_)?range(_name)?$/i);
+  if (directRange) return directRange;
+  const start = findMetadataValue(apiResponse, /(^|_)(range_)?(start|from|min)$/i);
+  const end = findMetadataValue(apiResponse, /(^|_)(range_)?(end|to|max)$/i);
+  return start && end ? `${start}-${end}`.slice(0, 160) : 'Unknown range';
+}
+
+function extractService(apiResponse) {
+  return findMetadataValue(apiResponse, /(^|_)(service|service_name|provider|operator|carrier|client|application|app)$/i) || 'Unknown service';
+}
+
+function formatTelegramText(otpValues, phoneNumber, activeRange = 'Unknown range', service = 'Unknown service') {
+  const normalizedPhone = normalizePhoneNumber(phoneNumber);
+  if (!Array.isArray(otpValues) || !otpValues.length || !normalizedPhone) return '';
+  return [
+    'OTP Update',
+    `Time: ${new Date().toISOString()}`,
+    `Number: +${normalizedPhone}`,
+    `OTP: ${otpValues.join(', ')}`,
+    `Range: ${normalizeMetadataValue(activeRange) || 'Unknown range'}`,
+    `Service: ${normalizeMetadataValue(service) || 'Unknown service'}`,
+  ].join('\n');
+}
+
+function buildOtpRecords(apiResponse, at = new Date().toISOString()) {
+  const phone = extractPhoneNumber(apiResponse);
+  const otpValues = extractOtpValues(apiResponse);
+  if (!phone || !otpValues.length) return [];
+  const range = extractActiveRange(apiResponse);
+  const service = extractService(apiResponse);
+  return otpValues.map((otp) => ({ otp, phone, range, service, at }));
 }
 
 const COUNTRY_CALLING_CODES = [
@@ -109,6 +181,9 @@ function extractPhoneNumber(value, path = []) {
     return '';
   }
   const text = String(value);
+  const context = path.join('.').toLowerCase();
+  const hasPhoneContext = !path.length || /(phone|mobile|msisdn|sender|from|caller|number|num|cli|recipient|destination)/i.test(context) || /(phone|mobile|msisdn|sender|caller|number|destination)/i.test(text);
+  if (!hasPhoneContext) return '';
   const candidates = text.match(/(?:\+|00)?\d[\d().\s-]{6,}\d/g) || [];
   return candidates.map(normalizePhoneNumber).find(Boolean) || '';
 }
@@ -174,6 +249,10 @@ function hashCode(code) {
   return crypto.createHash('sha256').update(String(code)).digest('hex');
 }
 
+function hashOtpRecord(record) {
+  return hashCode(`${record.phone}:${record.otp}:${record.range || ''}:${record.service || ''}`);
+}
+
 function createForwarder({ username = 'default', settingsProvider = () => process.env, fetchImpl = globalThis.fetch, pollIntervalMs = DEFAULT_POLL_INTERVAL_MS } = {}) {
   if (typeof fetchImpl !== 'function') throw new Error('Fetch API is unavailable.');
   const stateKey = String(username);
@@ -197,23 +276,37 @@ function createForwarder({ username = 'default', settingsProvider = () => proces
       const config = settingsProvider(stateKey) || {};
       const apiResponse = await fetchApiResponse(config);
       const allCodes = extractOtpValues(apiResponse);
-      const newCodes = allCodes.filter((code) => !seenCodeHashes.has(hashCode(code)));
-      if (!newCodes.length) {
-        updateState({ lastResult: allCodes.length ? 'duplicate' : 'no-otp' }, stateKey);
-        return { sent: false, reason: allCodes.length ? 'duplicate' : 'no-otp' };
+      if (!allCodes.length) {
+        updateState({ lastResult: 'no-otp' }, stateKey);
+        return { sent: false, reason: 'no-otp' };
       }
-      const message = formatTelegramText(newCodes);
+      const phone = extractPhoneNumber(apiResponse);
+      if (!phone) {
+        updateState({ lastResult: 'no-number' }, stateKey);
+        return { sent: false, reason: 'no-number' };
+      }
+      const records = buildOtpRecords(apiResponse);
+      const newRecords = records.filter((record) => !seenCodeHashes.has(hashOtpRecord(record)));
+      if (!newRecords.length) {
+        updateState({ lastResult: 'duplicate' }, stateKey);
+        return { sent: false, reason: 'duplicate' };
+      }
+      const message = formatTelegramText(newRecords.map((record) => record.otp), phone, newRecords[0].range, newRecords[0].service);
       if (!message) {
         updateState({ lastResult: 'no-otp' }, stateKey);
-        return { sent: false, reason: 'empty-message' };
+        return { sent: false, reason: 'no-otp' };
       }
       await sendTelegramMessage(config, message, fetchImpl);
-      newCodes.forEach((code) => seenCodeHashes.add(hashCode(code)));
+      newRecords.forEach((record) => seenCodeHashes.add(hashOtpRecord(record)));
       const activity = buildForwardingActivity(apiResponse);
       const currentState = readState(stateKey);
       const recentActivity = [activity, ...(Array.isArray(currentState.recentActivity) ? currentState.recentActivity : [])].slice(0, 20);
-      updateState({ lastSendAt: activity.at, lastResult: 'sent', sentCount: Number(currentState.sentCount || 0) + 1, recentActivity, seenCodeHashes: [...seenCodeHashes].slice(-1000) }, stateKey);
-      return { sent: true, reason: null, count: newCodes.length, activity };
+      const recentOtpRecords = [
+        ...newRecords,
+        ...(Array.isArray(currentState.recentOtpRecords) ? currentState.recentOtpRecords : []),
+      ].slice(0, 100);
+      updateState({ lastSendAt: activity.at, lastResult: 'sent', sentCount: Number(currentState.sentCount || 0) + 1, recentActivity, recentOtpRecords, seenCodeHashes: [...seenCodeHashes].slice(-1000) }, stateKey);
+      return { sent: true, reason: null, count: newRecords.length, records: newRecords, activity };
     } catch (error) {
       updateState({ lastResult: 'error', error: error.message || String(error) }, stateKey);
       return { sent: false, reason: 'error', error: error.message || String(error) };
@@ -223,10 +316,10 @@ function createForwarder({ username = 'default', settingsProvider = () => proces
   }
 
   async function start() {
-    await runOnce();
+    const initialResult = await runOnce();
     timer = setInterval(() => runOnce(), pollIntervalMs);
     if (timer.unref) timer.unref();
-    return { username: stateKey, pollIntervalMs };
+    return { username: stateKey, pollIntervalMs, initialResult };
   }
 
   function stop() {
@@ -241,6 +334,6 @@ const defaultForwarder = createForwarder();
 async function runOnce() { return defaultForwarder.runOnce(); }
 async function startForwarder() { return defaultForwarder.start(); }
 
-module.exports = { buildApiUrl, buildForwardingActivity, collectCodesFromText, countryCodeForPhone, createForwarder, deepCollectOtpValues, extractOtpValues, extractPhoneNumber, flagForCountryCode, formatTelegramText, maskPhoneNumber, runOnce, sendTelegramMessage, startForwarder };
+module.exports = { buildApiUrl, buildForwardingActivity, buildOtpRecords, collectCodesFromText, countryCodeForPhone, createForwarder, deepCollectOtpValues, extractActiveRange, extractOtpValues, extractPhoneNumber, extractService, flagForCountryCode, formatTelegramText, maskPhoneNumber, runOnce, sendTelegramMessage, startForwarder };
 
 if (require.main === module) startForwarder().catch((error) => { console.error(error.message || error); process.exitCode = 1; });

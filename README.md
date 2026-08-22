@@ -1,6 +1,6 @@
 # Itachi OTP Forwarder
 
-This Node.js service provides an Itachi Uchiha-themed dashboard for multiple accounts. Each account has an isolated background worker that polls the CR API and forwards only newly discovered numeric OTP values to that account’s Telegram chats. Empty API responses, responses without an OTP, and previously forwarded OTP values are suppressed.
+This Node.js service provides an Itachi Uchiha-themed dashboard for multiple accounts. Each account has an isolated background worker that polls the CR API and forwards only newly discovered records that contain both a numeric OTP and an associated phone number to that account’s Telegram chats. Empty API responses, responses without an OTP or number, and previously forwarded OTP/number pairs are suppressed. Authenticated users can view their own recent valid OTP records on the website and copy a selected number or OTP. Each record also includes the detected service and active range; common field names such as `service`, `service_name`, `provider`, `operator`, `carrier`, `range`, `active_range`, `range_start`, and `range_end` are supported. If the API does not provide either value, the dashboard shows `Unknown service` or `Unknown range`.
 
 ## Configuration
 
@@ -24,7 +24,7 @@ Railway can deploy this repository with the included `railway.json`, which runs 
 
 If the deployment log says `ADMIN_PASSWORD must contain at least 10 characters`, open Railway **Variables**, replace `ADMIN_PASSWORD` with a value of at least 10 characters, save the variables, and redeploy. Do not include quotation marks around the value, and do not use the placeholder from `.env.example`.
 
-The login screen includes separate **Administrator login** and **New user login** modes. Applicants can request a username and receive a random one-time approval key that expires after 30 minutes. They send that key to the administrator through the built-in WhatsApp contact button for **923110470403**. The administrator enters the key in the **Approve registration request** panel; only then can the applicant create a password and complete registration. Administrators can also create team accounts directly from the User accounts panel. The browser dashboard is not required to remain open for forwarding to continue. Do not deploy multiple replicas of this service because each replica would run its own polling workers; use one service instance with one persistent volume.
+The login screen includes separate **Administrator login** and **New user login** modes. Applicants can request a username and receive a random one-time approval key that expires after 30 minutes. They send that key to the administrator through the built-in WhatsApp contact button for **923110470403**. The administrator enters the key in the **Approve registration request** panel; only then can the applicant create a password and complete registration. Administrators can also create team accounts directly from the User accounts panel. The browser dashboard is not required to remain open for forwarding to continue. The dashboard’s **OTP records** panel shows only valid records for the signed-in account; incomplete or unrelated API messages are never listed. Do not deploy multiple replicas of this service because each replica would run its own polling workers; use one service instance with one persistent volume.
 
 ## Persistence and deployment
 
@@ -36,7 +36,7 @@ The `.env` file and all runtime JSON stores are ignored by Git. Rotate any CR AP
 
 ## Verification
 
-The regression suite covers numeric OTP extraction, empty-message suppression, message formatting, two-user Telegram isolation, duplicate suppression, encrypted per-user settings, masked forwarding activity, and approved registration completion. Run it with `npm test` before deployment.
+The regression suite covers numeric OTP extraction, empty-message suppression, OTP-and-number message formatting, rejection of records without a number, two-user Telegram isolation, duplicate suppression, encrypted per-user settings, masked forwarding activity, and approved registration completion. Run it with `npm test` before deployment.
 
 ## References
 

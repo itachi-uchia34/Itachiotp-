@@ -31,8 +31,8 @@ async function configureUser(username) {
   if (!hasUserSettings(key)) return { active: false, reason: 'not-configured' };
   const worker = createForwarder({ username: key, settingsProvider: (user) => ({ ...process.env, ...getUserSettings(user) }) });
   workers.set(key, worker);
-  await worker.start();
-  return { active: true };
+  const started = await worker.start();
+  return { active: true, initialResult: started.initialResult };
 }
 
 async function startAll() {
@@ -44,7 +44,10 @@ async function startAll() {
 async function pollUser(username) {
   const key = String(username);
   if (!hasUserSettings(key)) return { sent: false, reason: 'not-configured' };
-  if (!workers.has(key)) await configureUser(key);
+  if (!workers.has(key)) {
+    const configured = await configureUser(key);
+    return configured.initialResult || { sent: false, reason: 'not-configured' };
+  }
   return workers.get(key).runOnce();
 }
 
@@ -52,8 +55,13 @@ function getUserStatus(username) {
   return sanitizedStatus(String(username));
 }
 
+function getOtpRecords(username) {
+  const state = readState(String(username));
+  return Array.isArray(state.recentOtpRecords) ? state.recentOtpRecords : [];
+}
+
 function activeUsernames() {
   return [...workers.keys()];
 }
 
-module.exports = { activeUsernames, configureUser, getUserStatus, pollUser, startAll, stopUser };
+module.exports = { activeUsernames, configureUser, getOtpRecords, getUserStatus, pollUser, startAll, stopUser };

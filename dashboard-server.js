@@ -101,6 +101,10 @@ async function startDashboardServer() {
         const user = requireUser(req, res);
         return user ? sendJson(res, 200, publicStatus(user)) : undefined;
       }
+      if (req.method === 'GET' && req.url === '/api/otp-records') {
+        const user = requireUser(req, res);
+        return user ? sendJson(res, 200, { records: workers.getOtpRecords(user.username) }) : undefined;
+      }
       if (req.method === 'GET' && (req.url === '/api/settings' || req.url === '/api/my-settings')) {
         const user = requireUser(req, res);
         return user ? sendJson(res, 200, publicUserSettings(user.username)) : undefined;
